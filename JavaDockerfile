@@ -1,0 +1,39 @@
+FROM maven:3.9.11-eclipse-temurin-8
+LABEL authors="Simple"
+ARG DOMAIN
+ARG USERNAME
+ARG PASSWORD
+ARG GIT_USERNAME
+ARG GIT_USEREMAIL
+ENV TZ=Asia/Shanghai DEBIAN_FRONTEND=noninteractive
+ENV DOMAIN=${DOMAIN} USERNAME=${USERNAME} PASSWORD=${PASSWORD} GIT_USERNAME=${GIT_USERNAME} GIT_USEREMAIL=${GIT_USEREMAIL}
+WORKDIR /root
+SHELL ["/bin/bash", "-c"]
+RUN sed -i 's@//.*archive.ubuntu.com@//mirrors.ustc.edu.cn@g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sed -i 's/security.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    sed -i 's/http:/https:/g' /etc/apt/sources.list.d/ubuntu.sources && \
+    apt update && \
+    apt install -y tzdata jq && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
+    echo $TZ > /etc/timezone && \
+    apt clean && rm -rf /var/lib/apt/lists/* && \
+    echo '<settings><localRepository>/root/.m2/repository</localRepository><mirrors><mirror><id>ali</id><mirrorOf>*</mirrorOf><name>ali</name><url>https://maven.aliyun.com/repository/public</url></mirror></mirrors></settings>' > /usr/share/maven/conf/settings.xml && \
+    git config --global credential.helper store && \
+    git config --global alias.co checkout && \
+    git config --global alias.ci commit && \
+    git config --global alias.br branch && \
+    git config --global alias.st status && \
+    git config --global alias.ps push && \
+    git config --global alias.pl pull && \
+    git config --global alias.ft fetch && \
+    git config --global alias.mg merge && \
+    git config --global alias.lg "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit" && \
+    git config --global http."$DOMAIN".proxy socks5://host.docker.internal:11080 && \
+    git config --global user.name "$GIT_USERNAME" && \
+    git config --global user.email "$GIT_USEREMAIL" && \
+    if [[ $DOMAIN =~ ^(http://|https://)(.*) ]]; then \
+        echo -n "${BASH_REMATCH[1]}"$(jq -nr --arg val "$USERNAME" '$val|@uri')"":"$(jq -nr --arg val "$PASSWORD" '$val|@uri')@${BASH_REMATCH[2]}" > ~/.git-credentials && \
+        chmod 600 ~/.git-credentials; \
+    fi
+
+ENTRYPOINT ["bash"]
